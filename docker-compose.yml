@@ -1,0 +1,52 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: awais-youtube-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  ollama-model-pull:
+    image: ollama/ollama:latest
+    container_name: awais-youtube-model-init
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      until ollama list >/dev/null 2>&1; do sleep 2; done;
+      ollama pull "$$OLLAMA_MODEL"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: awais-youtube-studio
+    restart: unless-stopped
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OUTPUT_DIR: outputs
+    ports:
+      - "8000:8000"
+    volumes:
+      - video_outputs:/app/outputs
+    depends_on:
+      ollama-model-pull:
+        condition: service_completed_successfully
+
+volumes:
+  ollama_data:
+  video_outputs:
