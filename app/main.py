@@ -8,7 +8,7 @@ from pydantic import BaseModel,Field
 from app.media import render,extract
 from app.publishing import upload
 ROOT=Path(__file__).resolve().parent.parent;OUT=ROOT/os.getenv("OUTPUT_DIR","outputs");OUT.mkdir(exist_ok=True)
-DB=ROOT/os.getenv("DATABASE_PATH","studio.sqlite3");OLLAMA=os.getenv("OLLAMA_URL","http://ollama:11434").rstrip("/");MODEL=os.getenv("OLLAMA_MODEL","llama3.2")
+DB=ROOT/os.getenv("DATABASE_PATH","studio.sqlite3");DB.parent.mkdir(parents=True,exist_ok=True);OLLAMA=os.getenv("OLLAMA_URL","http://ollama:11434").rstrip("/");MODEL=os.getenv("OLLAMA_MODEL","llama3.2")
 app=FastAPI(title="Awais Labs AI YouTube Studio",version="0.3.0")
 app.add_middleware(CORSMiddleware,allow_origins=os.getenv("CORS_ORIGINS","*").split(","),allow_methods=["*"],allow_headers=["*"])
 class Script(BaseModel):
