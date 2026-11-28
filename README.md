@@ -1,69 +1,50 @@
 # Awais Labs AI YouTube Studio
 
-Free-first, open-source-first YouTube creator workspace.
+Free-first, self-hosted AI creator workspace.
 
-## Current MVP (v0.2)
+## v0.3 features
 
-- FastAPI backend and responsive web dashboard
-- Long-form script generation through a locally hosted Ollama model
-- Generate up to five distinct Shorts scripts per request (default target: three daily)
-- FFmpeg draft rendering in landscape (16:9) and vertical Shorts (9:16)
-- Job listing endpoint and downloadable MP4 drafts
-- Docker Compose setup for the app, Ollama, and automatic model download
+- Ollama-based long-form script and multiple Shorts script generation.
+- Background production jobs and SQLite job history.
+- FFmpeg landscape (16:9) and Shorts (9:16) rendering.
+- Optional Edge TTS narration and embedded timed captions.
+- Optional Pexels stock video retrieval; text-scene fallback when no API key is configured.
+- Uploaded long-video scene-change candidate extraction and vertical clip export.
+- Output checks for dimensions, duration, file size and audio presence.
+- YouTube Data API upload endpoint gated by OAuth token and explicit server flags.
+- Docker Compose stack with FFmpeg and local Ollama.
 
-**Important:** This is still an MVP, not a fully autonomous publishing platform. The renderer currently creates designed text-scene drafts; cinematic footage, narration, automated clip extraction, persistent background jobs, YouTube OAuth/upload, scheduling, and analytics are not yet implemented. Do not treat generated drafts as production-ready cinematic videos.
+## Important limitations
 
-## Run with Docker
+This release does not provide guaranteed viral prediction, trend research, original AI text-to-video generation, or fully unattended daily scheduling. Clip extraction is a scene-change heuristic only. ComfyUI endpoint detection is included, but a workflow-specific generation adapter is not implemented. Pexels requires an API key. Edge TTS requires network access. Review generated media and confirm licensing before publishing.
 
-Requirements: Docker Desktop or Docker Engine with Docker Compose.
+YouTube upload requires a Google Cloud project, enabled YouTube Data API, OAuth consent and a valid authorized-user token at secrets/youtube-token.json. Upload and auto-publish are disabled by default. Set ENABLE_YOUTUBE_UPLOAD=true only after OAuth setup. Auto-publishing additionally requires AUTO_PUBLISH=true and a passed quality check. Default privacy is private.
 
-```bash
-git clone https://github.com/learnislamwithawais-ops/awais-labs-ai-youtube-studio-.git
-cd awais-labs-ai-youtube-studio-
-docker compose up --build -d
-```
+## Run
 
-Open http://localhost:8000. First startup downloads the configured Ollama model (default `llama3.2`), which can take several minutes and several GB of disk space.
+Copy .env.example to .env, then run:
+
+    docker compose up --build -d
+
+Open http://localhost:8000. The first launch downloads the Ollama model and may consume several GB.
 
 Useful commands:
 
-```bash
-docker compose ps
-docker compose logs -f app
-docker compose logs -f ollama-model-pull
-docker compose down
-```
+    docker compose ps
+    docker compose logs -f app
+    docker compose logs -f ollama-model-pull
+    docker compose down
 
-## Local run
-
-Requirements: Python 3.11+, FFmpeg, and Ollama.
-
-```bash
-ollama pull llama3.2
-ollama serve
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+Never commit .env, API keys or the secrets directory. Do not expose Ollama publicly.
 
 ## API
 
-- `GET /api/health` — health and version
-- `GET /api/config` — runtime settings and supported formats
-- `POST /api/script` — long-form script
-- `POST /api/shorts` — generate 1–5 distinct Shorts scripts
-- `POST /api/render` — render a draft; set `format` to `landscape` or `shorts`
-- `GET /api/jobs` — rendered drafts
+- GET /api/health, /api/config, /api/providers
+- POST /api/script and POST /api/shorts
+- POST /api/produce for background production
+- POST /api/render for manual rendering
+- GET /api/jobs and GET /api/jobs/{id}
+- POST /api/clips for uploaded source-video clip candidates
+- POST /api/publish/{id} for quality-passed jobs
 
-Example Shorts request:
-
-```json
-{"topic":"Hidden facts about space","count":3,"language":"English"}
-```
-
-## Configuration and security
-
-Set `OLLAMA_MODEL`, `OLLAMA_URL`, and `OUTPUT_DIR` as needed. Never commit API keys, OAuth secrets, refresh tokens, or a populated `.env` file. The current CORS policy is permissive for local development; restrict origins, add authentication, limits, and a persistent queue before public hosting.
-
-YouTube publishing is intentionally not enabled until Google Cloud OAuth credentials, channel authorization, and upload review controls are implemented.
+Before public hosting add authentication, rate limits, strict CORS, upload quotas, malware scanning and a durable worker queue. Current background jobs run in the web process and are intended for a private single-instance deployment.

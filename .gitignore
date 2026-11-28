@@ -1,7 +1,8 @@
-.env
-.venv/
 __pycache__/
-*.pyc
-client_secret.json
-token.json
+*.py[cod]
+.venv/
+.env
+secrets/
 outputs/
+*.sqlite3
+*.db
