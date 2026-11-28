@@ -18,7 +18,7 @@ services:
     restart: "no"
     environment:
       OLLAMA_HOST: http://ollama:11434
-      OLLAMA_MODEL: \${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
     entrypoint: ["/bin/sh", "-c"]
     command: >-
       until ollama list >/dev/null 2>&1; do sleep 2; done;
@@ -32,16 +32,25 @@ services:
     restart: unless-stopped
     environment:
       OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: \${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
       OUTPUT_DIR: outputs
       DATABASE_PATH: /app/studio-data/studio.sqlite3
-      TTS_VOICE: \${TTS_VOICE:-en-US-GuyNeural}
-      PEXELS_API_KEY: \${PEXELS_API_KEY:-}
-      ENABLE_YOUTUBE_UPLOAD: \${ENABLE_YOUTUBE_UPLOAD:-false}
-      AUTO_PUBLISH: \${AUTO_PUBLISH:-false}
+      TTS_VOICE: ${TTS_VOICE:-en-US-GuyNeural}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      ENABLE_YOUTUBE_UPLOAD: ${ENABLE_YOUTUBE_UPLOAD:-false}
+      AUTO_PUBLISH: ${AUTO_PUBLISH:-false}
       YOUTUBE_TOKEN_FILE: /app/secrets/youtube-token.json
-      YOUTUBE_DEFAULT_PRIVACY: \${YOUTUBE_DEFAULT_PRIVACY:-private}
-      CORS_ORIGINS: \${CORS_ORIGINS:-*}
+      YOUTUBE_DEFAULT_PRIVACY: ${YOUTUBE_DEFAULT_PRIVACY:-private}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      COMFYUI_URL: ${COMFYUI_URL:-}
+      YOUTUBE_DATA_API_KEY: ${YOUTUBE_DATA_API_KEY:-}
+      ENABLE_DAILY_SCHEDULER: ${ENABLE_DAILY_SCHEDULER:-false}
+      DAILY_SHORTS_TOPIC: ${DAILY_SHORTS_TOPIC:-}
+      DAILY_SHORTS_COUNT: ${DAILY_SHORTS_COUNT:-3}
+      DAILY_SHORTS_LANGUAGE: ${DAILY_SHORTS_LANGUAGE:-English}
+      DAILY_SCHEDULE_HOUR: ${DAILY_SCHEDULE_HOUR:-9}
+      DAILY_SCHEDULE_MINUTE: ${DAILY_SCHEDULE_MINUTE:-0}
+      SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE:-Asia/Karachi}
     ports:
       - "8000:8000"
     volumes:
