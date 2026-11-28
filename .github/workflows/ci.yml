@@ -1,0 +1,22 @@
+name: Validate Awais Labs Studio
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile Python modules
+        run: python -m compileall -q app
+      - name: Import FastAPI application
+        run: python -c "from app.main import app; print(app.title)"
