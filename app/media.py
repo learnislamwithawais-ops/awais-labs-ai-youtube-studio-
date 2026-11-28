@@ -45,11 +45,11 @@ def render(script,title,work,fmt):
  if has_audio:
   try:secs=max(secs,duration(audio))
   except Exception:pass
- each=secs/len(scenes); concat=work/"scenes.txt";entries=[]
+ each=secs/len(scenes); concat=work/"scenes.txt";entries=[];used_stock=False
  visual=re.search(r"\[VISUAL:\s*(.*?)\]",script,re.I);query=visual.group(1) if visual else title
  for i,line in enumerate(scenes):
   txt=work/f"text{i}.txt";txt.write_text(textwrap.fill(line,width=24 if vertical else 46)[:500],encoding="utf-8")
-  clip=work/f"scene{i}.mp4";bg=work/f"stock{i}.mp4";has_stock=stock(query,bg)
+  clip=work/f"scene{i}.mp4";bg=work/f"stock{i}.mp4";has_stock=stock(query,bg);used_stock=used_stock or has_stock
   if has_stock:
    inp=["-stream_loop","-1","-i",str(bg)]
    vf=f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},drawbox=x=0:y=ih*0.62:w=iw:h=ih*0.38:color=black@0.45:t=fill,drawtext=textfile='{txt}':fontcolor=white:fontsize={52 if vertical else 44}:x=(w-text_w)/2:y=h*0.7"
@@ -66,7 +66,7 @@ def render(script,title,work,fmt):
  else:run(["ffmpeg","-y","-i",str(silent),"-vf",vf,"-c:v","libx264","-preset","veryfast","-pix_fmt","yuv420p","-movflags","+faststart",str(out)])
  meta=json.loads(run(["ffprobe","-v","error","-show_entries","stream=codec_type,width,height","-show_entries","format=duration,size","-of","json",str(out)]).stdout)
  vs=next((x for x in meta["streams"] if x.get("codec_type")=="video"),{})
- checks={"passed":out.exists() and int(meta["format"]["size"])>50000 and vs.get("width")==w and vs.get("height")==h,"resolution":f"{vs.get('width')}x{vs.get('height')}","duration_seconds":round(float(meta["format"]["duration"]),1),"has_audio":any(x.get("codec_type")=="audio" for x in meta["streams"]),"voice_generated":has_audio,"stock_footage_used":has_stock}
+ checks={"passed":out.exists() and int(meta["format"]["size"])>50000 and vs.get("width")==w and vs.get("height")==h,"resolution":f"{vs.get('width')}x{vs.get('height')}","duration_seconds":round(float(meta["format"]["duration"]),1),"has_audio":any(x.get("codec_type")=="audio" for x in meta["streams"]),"voice_generated":has_audio,"stock_footage_used":used_stock}
  return out,checks
 def extract(source,outdir,limit=8):
  outdir=Path(outdir);outdir.mkdir(parents=True,exist_ok=True);length=duration(source)
@@ -82,5 +82,5 @@ def extract(source,outdir,limit=8):
  for i,s in enumerate(starts):
   p=outdir/f"candidate_{i+1}.mp4"
   run(["ffmpeg","-y","-ss",str(s),"-i",str(source),"-t",str(min(35,length-s)),"-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920","-c:v","libx264","-preset","veryfast","-c:a","aac",str(p)])
-  result.append({"file":p.name,"start_seconds":round(s,1),"video":f"/outputs/{outdir.name}/{p.name}"})
+  result.append({"file":p.name,"start_seconds":round(s,1),"video":f"/outputs/{outdir.parent.name}/{outdir.name}/{p.name}"})
  return result
