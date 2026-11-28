@@ -39,20 +39,55 @@ def ai(prompt):
  except Exception as e:raise HTTPException(503,f"Local Ollama unavailable: {e}")
 def make_script(topic,minutes,lang):
  return ai(f"Write a {minutes}-minute narration-ready YouTube script in {lang} about {topic}. Add a powerful hook, story arc, spoken paragraphs, [VISUAL: ...] directions and CTA.")
-def worker(j,topic,fmt,lang,mins,auto):
+def worker(j,topic,fmt,lang,mins,auto,provided_script=None):
  try:
-  update(j,status="generating");script=make_script(topic,mins,lang);title=next((x.lstrip("# ").strip() for x in script.splitlines() if x.strip()),topic)[:100]
+  update(j,status="generating");script=provided_script or make_script(topic,mins,lang);title=next((x.lstrip("# ").strip() for x in script.splitlines() if x.strip()),topic)[:100]
   update(j,status="rendering",title=title,script=script)
   video,checks=render(script,title,OUT/j,fmt);update(j,status="quality_passed" if checks["passed"] else "quality_failed",video=f"/outputs/{j}/video.mp4",checks=checks)
   if auto and checks["passed"] and os.getenv("AUTO_PUBLISH","false").lower()=="true":
    result=upload(video,title,script[:4000],privacy=os.getenv("YOUTUBE_DEFAULT_PRIVACY","private"));update(j,status="published",published_url=result["url"])
  except Exception as e:update(j,status="failed",error=str(e))
+scheduler=None
+def scheduled_shorts_batch():
+ topic=os.getenv("DAILY_SHORTS_TOPIC","")
+ if not topic:return
+ count=max(1,min(5,int(os.getenv("DAILY_SHORTS_COUNT","3"))))
+ lang=os.getenv("DAILY_SHORTS_LANGUAGE","English")
+ raw=ai(f'Create {count} distinct 30-45 second YouTube Shorts scripts in {lang} about {topic}. Each has a hook, narration and [VISUAL: ...] cue. Return only JSON: {{"shorts":[{{"title":"...","script":"..."}}]}}')
+ items=json.loads(raw).get("shorts",[])[:count]
+ for item in items:
+  script=item.get("script","").strip()
+  if len(script)<20:continue
+  jid=uuid.uuid4().hex[:12]
+  c=conn();c.execute("INSERT INTO jobs(id,kind,status,topic,format,title,script) VALUES(?,?,?,?,?,?,?)",(jid,"scheduled","queued",topic,"shorts",item.get("title",topic),script));c.commit();c.close()
+  worker(jid,topic,"shorts",lang,1,os.getenv("AUTO_PUBLISH","false").lower()=="true",script)
 @app.on_event("startup")
-def start():conn().close()
+def start():
+ global scheduler
+ conn().close()
+ if os.getenv("ENABLE_DAILY_SCHEDULER","false").lower()=="true" and os.getenv("DAILY_SHORTS_TOPIC"):
+  from apscheduler.schedulers.background import BackgroundScheduler
+  scheduler=BackgroundScheduler(timezone=os.getenv("SCHEDULER_TIMEZONE","Asia/Karachi"))
+  scheduler.add_job(scheduled_shorts_batch,"cron",hour=int(os.getenv("DAILY_SCHEDULE_HOUR","9")),minute=int(os.getenv("DAILY_SCHEDULE_MINUTE","0")),id="daily-shorts",replace_existing=True)
+  scheduler.start()
+@app.on_event("shutdown")
+def stop_scheduler():
+ if scheduler:scheduler.shutdown(wait=False)
 @app.get("/api/health")
 def health():return {"status":"ok","version":"0.3.0","product":"Awais Labs AI YouTube Studio"}
 @app.get("/api/config")
 def config():return {"model":MODEL,"daily_shorts_target":3,"formats":["landscape","shorts"],"youtube_upload_enabled":os.getenv("ENABLE_YOUTUBE_UPLOAD","false").lower()=="true","auto_publish_enabled":os.getenv("AUTO_PUBLISH","false").lower()=="true"}
+@app.get("/api/scheduler")
+def scheduler_status():
+ return {"enabled":os.getenv("ENABLE_DAILY_SCHEDULER","false").lower()=="true","topic_configured":bool(os.getenv("DAILY_SHORTS_TOPIC")),"daily_count":int(os.getenv("DAILY_SHORTS_COUNT","3")),"time":f'{os.getenv("DAILY_SCHEDULE_HOUR","9")}:{os.getenv("DAILY_SCHEDULE_MINUTE","0")}','timezone':os.getenv("SCHEDULER_TIMEZONE","Asia/Karachi")}
+@app.get("/api/trends")
+def trends(region:str="PK",max_results:int=10):
+ key=os.getenv("YOUTUBE_DATA_API_KEY")
+ if not key:raise HTTPException(503,"Set YOUTUBE_DATA_API_KEY to enable YouTube popular-video trend snapshots.")
+ try:
+  r=requests.get("https://www.googleapis.com/youtube/v3/videos",params={"part":"snippet,statistics","chart":"mostPopular","regionCode":region.upper(),"maxResults":max(1,min(25,max_results)),"key":key},timeout=20);r.raise_for_status()
+  return {"region":region.upper(),"items":[{"title":x["snippet"]["title"],"channel":x["snippet"]["channelTitle"],"views":x.get("statistics",{}).get("viewCount"),"video_id":x["id"],"url":"https://youtube.com/watch?v="+x["id"]} for x in r.json().get("items",[])]}
+ except Exception as e:raise HTTPException(502,f"YouTube trends request failed: {e}")
 @app.get("/api/providers")
 def providers():return {"ollama":True,"ffmpeg":bool(__import__("shutil").which("ffmpeg")),"pexels":bool(os.getenv("PEXELS_API_KEY")),"tts":"edge-tts optional","comfyui":{"configured":bool(os.getenv("COMFYUI_URL")),"note":"Workflow-specific adapter not included yet"},"youtube_oauth":os.path.exists(os.getenv("YOUTUBE_TOKEN_FILE","/app/secrets/youtube-token.json"))}
 @app.post("/api/script")
