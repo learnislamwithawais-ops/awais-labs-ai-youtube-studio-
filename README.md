@@ -48,3 +48,10 @@ Never commit .env, API keys or the secrets directory. Do not expose Ollama publi
 - POST /api/publish/{id} for quality-passed jobs
 
 Before public hosting add authentication, rate limits, strict CORS, upload quotas, malware scanning and a durable worker queue. Current background jobs run in the web process and are intended for a private single-instance deployment.
+
+
+## Daily automation and trends
+
+Optional daily scheduling uses APScheduler inside the single app process. Configure ENABLE_DAILY_SCHEDULER=true, DAILY_SHORTS_TOPIC, DAILY_SHORTS_COUNT, DAILY_SCHEDULE_HOUR, DAILY_SCHEDULE_MINUTE and SCHEDULER_TIMEZONE. It creates Shorts at the configured local time. It is disabled by default. For reliable multi-instance hosting, move scheduled jobs to a dedicated worker/queue and enable leader election.
+
+YouTube popular-video snapshots require YOUTUBE_DATA_API_KEY. This is a regional popular-video list, not a predictive trend score. Configure the key in .env to use the dashboard trend button.
